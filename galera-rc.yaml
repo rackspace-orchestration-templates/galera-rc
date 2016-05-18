@@ -253,7 +253,7 @@ resources:
       user_data_format: SOFTWARE_CONFIG
       networks:
       - network: { get_param: rc_network_name }
-      - uuid: 11111111-1111-1111-1111-111111111111
+      - network: 11111111-1111-1111-1111-111111111111
       metadata:
         rax-heat: { get_param: "OS::stack_id" }
         build_config: "backup_agent_only,monitoring_defaults"
