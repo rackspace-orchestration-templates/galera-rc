@@ -1,0 +1,114 @@
+heat_template_version: 2015-10-15
+
+description: |
+ #### Galera Secondary
+
+parameter_groups:
+
+parameters:
+  server_name:
+    type: string
+    default: example-0
+  server_flavor:
+    type: string
+    default: 4 GB General Purpose v1
+    constraints:
+    - allowed_values:
+      - 1 GB General Purpose v1
+      - 2 GB General Purpose v1
+      - 4 GB General Purpose v1
+      - 8 GB General Purpose v1
+  server_image:
+    type: string
+    default: Ubuntu 14.04 LTS (Trusty Tahr) (PVHVM) (Orchestration)
+    label: Server Image
+    description: Image to be used for all servers in this stack
+    constraints:
+    - allowed_values:
+      - Ubuntu 14.04 LTS (Trusty Tahr) (PVHVM) (Orchestration)
+      - CentOS 7 (PVHVM) (Orchestration)
+    immutable: true
+  ssh_key:
+    type: string
+    label: SSH Key
+    description: SSH Key for LAMP Slave Nodes
+  parent_stack_id:
+    type: string
+    default: None
+  rc_network_name:
+    type: string
+    label: RackConnect Network
+    description: Name or UUID of RackConnected network to attach this server to
+    constraints:
+    - custom_constraint: rackconnect.network
+  ansible_source:
+    type: string
+    default: http://catalog.rs-heat.com/ansible-roles/ansible-roles.tar.gz
+    label: Ansible Tarball
+    description: The Ansible Roles will be pulled from the location provided
+    immutable: true
+
+resources:
+  upload_role_config:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: script
+      outputs:
+      - name: results
+      config:
+        str_replace:
+          template: |
+            #!/bin/bash
+            set -e
+            mkdir -p /etc/ansible/roles
+            wget ansible_source -O /tmp/ansible-roles.tar.gz 2>&1
+            tar -xf /tmp/ansible-roles.tar.gz --strip-components=1 -C /etc/ansible/roles
+          params:
+            ansible_source: { get_param: ansible_source }
+  deploy_roles:
+    type: OS::Heat::SoftwareDeployment
+    properties:
+      signal_transport: TEMP_URL_SIGNAL
+      config:
+        get_resource: upload_role_config
+      server:
+        get_resource: galera_server
+  galera_server:
+    type: OS::Nova::Server
+    properties:
+      name: { get_param: "server_name" }
+      key_name: { get_param: "ssh_key" }
+      image: { get_param: server_image }
+      flavor: { get_param: server_flavor }
+      software_config_transport: POLL_TEMP_URL
+      config_drive: true
+      user_data_format: SOFTWARE_CONFIG
+      networks:
+      - network: { get_param: rc_network_name }
+      - uuid: 11111111-1111-1111-1111-111111111111
+      metadata:
+        rax-heat: { get_param: "parent_stack_id" }
+        build_config: "monitoring_defaults"
+  galera_server_public_ip:
+    type: Rackspace::RackConnect::PublicIP
+    depends_on:
+    - galera_server
+    properties:
+      server_id: { get_resource: galera_server }
+
+outputs:
+  server:
+    description: Server Resource
+    value: { get_resource: galera_server }
+  public_ip:
+    description: Server Public IP
+    value:
+      get_attr: [galera_server, accessIPv4]
+  private_ip:
+    description: Server Private IP
+    value:
+      get_attr: [galera_server, networks, private, 0]
+  rackconnect_ip:
+    description: RackConnect IP
+    value:
+      get_attr: [galera_server, networks, { get_param: rc_network_name }, 0]
