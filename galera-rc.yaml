@@ -69,7 +69,7 @@ parameters:
     immutable: true
   secondary_template:
     type: string
-    default: http://catalog.rs-heat.com/galera/galera-secondary.yaml
+    default: http://catalog.rs-heat.com/galera-rc/galera-rc-secondary.yaml
     label: Secondary Template
     description: Template to use for secondary servers
   ansible_source:
@@ -163,7 +163,7 @@ resources:
         galera_role: "master"
         galera_nodes: []
         firewall_global_rules: ["0.0.0.0,0,22,tcp", "0.0.0.0,0,3306,tcp"]
-        firewall_nodes: { get_attr: [ galera_secondary, private_ip ] }
+        firewall_nodes: { get_attr: [ galera_secondary, rackconnect_ip ] }
         firewall_node_rules: ["32,3306,tcp", "32,4567,tcp"]
       config:
         get_resource: galera_config
